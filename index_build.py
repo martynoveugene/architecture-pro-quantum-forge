@@ -20,6 +20,7 @@ embeddings = HuggingFaceEmbeddings(
     encode_kwargs={'normalize_embeddings': True}
 )
 
+# 400 и 50 - попробовать
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=2500,        # max symbols in the chunk
     chunk_overlap=300,      # overlap

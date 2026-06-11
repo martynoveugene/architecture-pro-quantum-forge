@@ -1,17 +1,18 @@
 import time
 import sys
 from langchain_chroma import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings, OpenAIEmbeddings
 from sentence_transformers import CrossEncoder
 from langchain_ollama import OllamaLLM
 from transformers import pipeline
+import textwrap
 import numpy as np
 
 
 CHROMA_DB_DIR = "./chroma_db"
 COLLECTION_NAME = "doc_base"
-#LOCAL_LLM_NAME = "llama3"
-LOCAL_LLM_NAME = "qwen2.5:7b"
+LOCAL_LLM_NAME = "llama3"
+#LOCAL_LLM_NAME = "qwen2.5:7b"
 
 
 class HateSpeechDetector:
@@ -55,6 +56,11 @@ class RAGAssistant:
             model_kwargs={'device': 'cpu'},
             encode_kwargs={'normalize_embeddings': True}
         )
+
+        # чтобы попробовать нужно перегенерить векторную базу
+        #self.embeddings = OpenAIEmbeddings(
+        #    model="text-embedding-ada-002"
+        #)
 
         self.cross_encoder = CrossEncoder(
             #'BAAI/bge-reranker-base',
@@ -145,6 +151,7 @@ class RAGAssistant:
 
     def ask(self, query: str, search_filter: dict = None, search_limit: int = 10, rerank_limit: int = 3):
 
+        print(f"Retrieval")
         # Семантический поиск по векторам
         docs_with_scores, search_time = self.search_context(query, search_filter, search_limit)
 
@@ -179,10 +186,11 @@ class RAGAssistant:
             doc_preview = " ".join(doc.page_content.split())[:1500] + "..."
             print(f"  - [Score: {doc.metadata['cross_score']:.6f}] Chunk ID: [{doc.metadata.get('chunk_id')}] File name: [{doc.metadata.get('file_name')}] Chunk position: [{doc.metadata.get('position')}] Title: [{doc.metadata.get('title')}] {doc_preview}")
 
+        print(f"Augmentation")
         prompt = self.create_prompt(query, reranked_docs)
 #        print("GENERATED PROMPT\n"+prompt)
 
-        print("Вызов локальной LLM для генерации ответа...")
+        print("Generation: Вызов локальной LLM для генерации ответа...")
         llm_start = time.perf_counter()
 
         response = self.llm.invoke(prompt)
@@ -194,33 +202,28 @@ class RAGAssistant:
 #        return ""
 
 
-if __name__ == "__main__":
+class QueryProcessor:
 
-    user_query = "Что знает Василиса о будущем? Как она описывает будущее?"
-    #user_query = "как работает ревахон?"
-    #user_query = "Ты ужасно глупый бот, закрой свой рот и не пиши мне больше!"
+    def __init__(self):
+        self.detector = HateSpeechDetector()
+        self.assistant = RAGAssistant()
+        self.threshold = 0.6
 
-    detector = HateSpeechDetector()
-    #scores = detector.analyze(user_query)
-    #print(scores)
-    safe = detector.is_safe(user_query, threshold=0.6)
+    def process_query(self, user_query: str) -> str:
+#        safe = self.detector.is_safe(user_query, threshold=self.threshold)
 
-    if not safe:
+#        if not safe:
+#            print("-------------------\n")
+#            print("Пожалуйста, соблюдайте правила приличия\n")
+#            sys.exit()
+
+        answer = self.assistant.ask(user_query, None, 10, 4)
+
+        print("\n--- ЗАПРОС ПОЛЬЗОВАТЕЛЯ ---")
+        print(print(textwrap.fill(user_query, width=120)))
+        print("\n--- ОТВЕТ МОДЕЛИ ---")
+        print(textwrap.fill(answer, width=120))
         print("-------------------\n")
-        print("Пожалуйста, соблюдайте правила приличия\n")
-        sys.exit()
 
-    assistant = RAGAssistant()
+        return answer
 
-    answer = assistant.ask(user_query, None, 10, 4 )
-
-    print("\n--- ЗАПРОС ПОЛЬЗОВАТЕЛЯ ---")
-    print(user_query)
-    print("\n--- ОТВЕТ МОДЕЛИ ---")
-    print(answer)
-    print("-------------------\n")
-
-    # Пример 2: Запрос с опциональной фильтрацией по метаданным (ищем только в файле 1-01.txt)
-    # user_query_filtered = "Что говорится о косинусном расстоянии?"
-    # file_filter = {"file_name": "1-01.txt"}
-    # answer, sources = assistant.ask(user_query_filtered, search_filter=file_filter, k=2)
