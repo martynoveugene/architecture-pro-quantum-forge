@@ -8,6 +8,8 @@ from transformers import pipeline
 import textwrap
 import numpy as np
 import torch
+from hate_speech_detector import HateSpeechDetector
+from query_cleaner import QueryCleaner
 
 
 CHROMA_DB_DIR = "./chroma_db"
@@ -15,40 +17,6 @@ COLLECTION_NAME = "doc_base"
 LOCAL_LLM_NAME = "llama3"
 #LOCAL_LLM_NAME = "qwen2.5:7b"
 
-
-class HateSpeechDetector:
-    def __init__(self):
-        print("Загрузка локальной модели детектора токсичности...")
-
-        model_name = "cointegrated/rubert-tiny-toxicity"
-
-        self.classifier = pipeline(
-            "text-classification",
-            model=model_name,
-            tokenizer=model_name,
-            device=-1
-        )
-        print("Модель hate-speech успешно загружена локально!\n" + "="*50)
-
-    def analyze(self, text: str) -> dict:
-        #results = self.classifier(text, top_k=None)
-        results = self.classifier(text, top_k=None, truncation=True, max_length=512)
-        if results and isinstance(results, list) and isinstance(results[0], list):
-            results = results[0]
-        scores = {item['label']: item['score'] for item in results}
-        return scores
-
-    def is_safe(self, text: str, threshold: float = 0.5) -> bool:
-        scores = self.analyze(text)
-        is_polite = scores.get('non-toxic', 1.0) >= threshold
-        #is_polite = scores.get('neutral', 1.0) >= threshold
-        has_toxic_elements = (
-                scores.get('dangerous', 0.0) > threshold or
-                scores.get('insult', 0.0) > threshold or
-                scores.get('obscenity', 0.0) > threshold or
-                scores.get('threat', 0.0) > threshold
-        )
-        return is_polite and not has_toxic_elements
 
 
 class RAGAssistant:
@@ -248,10 +216,13 @@ class RAGAssistant:
 
 class QueryProcessor:
 
-    def __init__(self, promptProtection: bool = True, searchProtection: bool = True):
+    def __init__(self, promptProtection: bool = True, searchProtection: bool = True, cleanQuery: bool = True):
         self.assistant = RAGAssistant()
         self.promptProtection = promptProtection
         self.searchProtection = searchProtection
+        self.cleanQuery = cleanQuery
+        self.cleaner = QueryCleaner()
+
 
 
     def process_query(self, user_query: str) -> str:
@@ -261,6 +232,11 @@ class QueryProcessor:
 #            print("-------------------\n")
 #            print("Пожалуйста, соблюдайте правила приличия\n")
 #            sys.exit()
+        if self.cleanQuery:
+            print(f"Исходный запрос пользователя: {user_query}")
+            user_query = self.cleaner.clean(user_query)
+            print(f"Очищенный запрос пользователя: {user_query}")
+
 
         answer = self.assistant.ask(user_query, None, 10, 3, self.promptProtection, self.searchProtection)
 
