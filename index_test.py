@@ -1,3 +1,4 @@
+import sys
 import time
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
@@ -40,6 +41,10 @@ def search(query: str, filter: dict = None):
     print(f"Search takes {execution_time_ms:.2f} мс.")
 
 if __name__ == "__main__":
+    search("cуперпароль")
+    print("success!")
+    sys.exit(0)
+
     search("Василиса машина времени")
     print("success!")
 

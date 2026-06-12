@@ -50,7 +50,7 @@ def extract_chapter_title(text, default_title):
 if __name__ == "__main__":
 
     documents_to_store = []
-    file_paths = glob.glob(os.path.join(SOURCE_DIR, "*.txt"))
+    file_paths = glob.glob(os.path.join(SOURCE_DIR, "malicious.txt"))
 
     if not file_paths:
         print(f"No txt files in the dir '{SOURCE_DIR}'")
