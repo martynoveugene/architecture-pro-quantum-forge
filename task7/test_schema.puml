@@ -1,0 +1,98 @@
+@startuml
+
+title Диаграмма последовательности процесса тестирования RAG-системы
+
+autonumber "<b>"
+
+participant "Скрипт теста\n(RagTest)" as Test
+participant "Лог-файл\n(test_log_*.log)" as Log
+participant "Основной RAG\n(QueryProcessor)" as RAG
+participant "Поиск\n(Retriever)" as Retr
+participant "Векторная БД\n(Chroma)" as DB
+participant "Проверка ввода\n(HateSpeechDetector)" as HSD
+participant "Ранжирование\n(CrossEncoder)" as Rerank
+participant "Генератор \nLLM" as LLM
+participant "Модель-судья" as Judge
+
+== Инициализация ==
+[-> Test : Вызов метода\n run_tests()
+activate Test
+
+Test -> Log : 1. Создание файла лога\n и начало логгирования
+activate Log
+
+Test -> RAG : 2. Инициализация компонентов RAG
+activate RAG
+RAG --> Test : Готово
+deactivate RAG
+
+Test -> Judge : 3. Инициализация Судьи
+activate Judge
+Judge --> Test : Готово
+deactivate Judge
+
+== Цикл запуска тестов ==
+loop По каждому вопросу из dataset.json
+
+    Test -> RAG : 4. Запрос пользователя (query)
+    activate RAG
+
+    == Этап извлечения (Retrieval) ==
+    RAG -> Retr : Инициирование поиска контекста
+    activate Retr
+
+    Retr -> DB : Поиск схожих векторов
+    activate DB
+    DB --> Retr : Возврат сырых чанков
+    deactivate DB
+
+    Retr -> HSD : Валидация документов
+    activate HSD
+    HSD --> Retr : Возврат безопасных чанков
+    deactivate HSD
+
+    Retr --> RAG : Передача отфильтрованных документов
+    deactivate Retr
+
+    == Этап переранжирования (Reranking) ==
+    RAG -> Rerank : Сортировка пар запрос-документ
+    activate Rerank
+    Rerank --> RAG : Возврат кросс-энкодер скоров
+    deactivate Rerank
+
+    == Этап генерации ответа (Generation) ==
+    RAG -> LLM : Отправка промпта + топ-контекста
+    activate LLM
+    LLM --> RAG : Сгенерированный текстовый ответ
+    deactivate LLM
+
+    RAG --> Test : Финальный ответ ассистента пользователя
+    deactivate RAG
+
+    == Этап оценки качества (Evaluation) ==
+    Test -> Judge : 5. Вызов evaluate
+    activate Judge
+
+    Judge -> Judge : Анализ вхождений, отсутствие стоп-слов\nи семантическая схожесть с эталоном
+
+    Judge --> Test : JSON-вердикт
+    deactivate Judge
+
+    == Логирование и проверка условий ==
+    alt Вердикт: оценки yes и score >= 4
+        Test -> Log : Запись: [ТЕСТ ПРОШЕЛ]
+    else
+        Test -> Log : Запись: [ТЕСТ НЕ ПРОШЕЛ] + ответ судьи
+    end
+
+end
+
+== Финализация и сбор метрик ==
+Test -> Log : Запись итогового отчета
+deactivate Log
+
+Test -> Test : 6. Запись детального отчета в test_results_*.json
+[<-- Test : Завершение процесса тестирования
+deactivate Test
+
+@enduml

@@ -238,7 +238,7 @@ class QueryProcessor:
             print(f"Очищенный запрос пользователя: {user_query}")
 
 
-        answer = self.assistant.ask(user_query, None, 10, 3, self.promptProtection, self.searchProtection)
+        answer = self.assistant.ask(user_query, None, 10, 4, self.promptProtection, self.searchProtection)
 
         print("\n--- ЗАПРОС ПОЛЬЗОВАТЕЛЯ ---")
         print(print(textwrap.fill(user_query, width=120)))
