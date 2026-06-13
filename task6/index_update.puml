@@ -1,0 +1,24 @@
+@startuml
+skinparam defaultFontName "Arial"
+
+title Схема обновления RAG-индекса
+
+node "Планировщик задач" as Scheduler
+file "Файл состояния источника\n(file_state.json)" as State
+component "Скрипт обновления\n(update_index.py)" as Script
+folder "Источник данных\n(TXT файлы)" as Source
+database "ChromaDB\n(Векторная база)" as DB
+file "Лог-файл\n(Локальный диск)" as Log
+actor "Администратор\n(Email)" as Admin
+
+Scheduler -down-> Script : 1. Запуск по расписанию
+
+State <--down-> Script : 2. Загрузка предыдущего актуального состояния источника\n7. Запись нового состояния источника
+
+Script -left-> Source : 3. Чтение измененных файлов
+Script <--> DB : 4. Сверка времени изменения файлов\n5. Удаление устаревших чанков\n6. Запись новых чанков и эмбеддингов
+
+Script -down-> Log : 8. Запись событий работы в реальном времени
+Script -right-> Admin : 9. Отправка итогового лога на почту
+
+@enduml
